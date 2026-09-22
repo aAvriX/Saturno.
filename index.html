@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Saturno de Amor</title>
 <style>
   :root {
@@ -18,13 +18,16 @@
     overflow: hidden;
     font-family: 'Georgia', 'Times New Roman', serif;
   }
-  #canvas-container {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  canvas { display: block; }
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+canvas { display: block; touch-action: none; }
 
  #title {
   position: fixed;
@@ -355,24 +358,26 @@
   }
 
   renderer.domElement.addEventListener('touchstart', function (e) {
-    if (e.touches.length === 1) {
-      onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
-    } else if (e.touches.length === 2) {
-      isDragging = false;
-      pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
-      pinchStartRadius = camRadius;
-    }
-  }, { passive: true });
+  if (e.touches.length === 1) {
+    onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+  } else if (e.touches.length === 2) {
+    e.preventDefault();
+    isDragging = false;
+    pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+    pinchStartRadius = camRadius;
+  }
+}, { passive: false });
 
-  renderer.domElement.addEventListener('touchmove', function (e) {
-    if (e.touches.length === 1) {
-      onPointerDrag(e.touches[0].clientX, e.touches[0].clientY);
-    } else if (e.touches.length === 2 && pinchStartDist) {
-      var newDist = touchDistance(e.touches[0], e.touches[1]);
-      var scale = pinchStartDist / newDist;
-      camRadius = Math.max(90, Math.min(460, pinchStartRadius * scale));
-    }
-  }, { passive: true });
+renderer.domElement.addEventListener('touchmove', function (e) {
+  if (e.touches.length === 1) {
+    onPointerDrag(e.touches[0].clientX, e.touches[0].clientY);
+  } else if (e.touches.length === 2 && pinchStartDist) {
+    e.preventDefault();
+    var newDist = touchDistance(e.touches[0], e.touches[1]);
+    var scale = pinchStartDist / newDist;
+    camRadius = Math.max(90, Math.min(460, pinchStartRadius * scale));
+  }
+}, { passive: false });
 
   renderer.domElement.addEventListener('touchend', function (e) {
     onPointerUp();
