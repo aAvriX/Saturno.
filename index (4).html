@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" href="saturno.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Una Planeta para mi Luna</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #000000;
+    overflow: hidden;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+canvas { display: block; touch-action: none; }
+
+ #title {
+  position: fixed;
+  top: calc(24px + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #ffdd55;
+  font-size: clamp(18px, 4vw, 30px);
+  letter-spacing: 3px;
+  text-shadow: 0 0 12px rgba(255, 221, 85, 0.6), 0 0 30px rgba(255, 200, 60, 0.3);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  animation: fadeIn 3s ease forwards 0.5s;
+}
+
+#subtitle {
+  position: fixed;
+  top: calc(58px + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #ffe98a;
+  font-size: clamp(14px, 2.6vw, 20px);
+  letter-spacing: 2px;
+  font-style: italic;
+  text-shadow: 0 0 10px rgba(255, 221, 85, 0.5), 0 0 22px rgba(255, 200, 60, 0.25);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  animation: fadeIn 3s ease forwards 1.6s;
+}
+
+  #hint {
+    position: fixed;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: rgba(255, 221, 85, 0.45);
+    font-size: 12px;
+    letter-spacing: 1px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    animation: fadeIn 3s ease forwards 2s;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+
+  #music-btn {
+    position: fixed;
+    top: calc(20px + env(safe-area-inset-top, 0px));
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 221, 85, 0.4);
+    background: rgba(20, 16, 0, 0.45);
+    color: #ffdd55;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    backdrop-filter: blur(4px);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  #music-btn:hover { transform: scale(1.08); background: rgba(40, 30, 0, 0.6); }
+  #music-btn.playing { box-shadow: 0 0 14px rgba(255, 221, 85, 0.6); }
+
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffdd55;
+    font-size: 14px;
+    letter-spacing: 2px;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+  }
+</style>
+</head>
+<body>
+<div id="loading">cargando el universo...</div>
+<div id="canvas-container"></div>
+<div id="title">✧ Para ti ✧</div>
+<div id="subtitle">𖹭 Te amo 𖹭</div>
+<div id="hint">mueve o arrastra para mirar alrededor · doble tap para flores y corazones</div>
+<button id="music-btn" title="Reproducir musica">♪</button>
+
+<!--
+  ======================================================================
+  SECCION DE MUSICA — coloca aqui tu cancion o un trozo en bucle
+  ======================================================================
+  Ahora hay TRES formas de poner tu cancion:
+
+  Opcion A (la mas facil, recien agregada): toca el boton de notita
+  musical (♪) arriba a la derecha. Como todavia no hay ninguna cancion
+  configurada mas abajo, el boton va a abrir el selector de archivos de
+  tu computadora para que elijas tu mp3 (por ejemplo "Eres TuCut.mp3")
+  directamente, sin convertir nada. Esto funciona siempre que la persona
+  que vea la pagina la abra y elija su propio archivo — no queda
+  "incrustada" la cancion dentro del HTML, cada quien debe seleccionarla.
+
+  Opcion B: si quieres que la cancion venga YA incluida dentro del
+  archivo HTML (para que suene sin que nadie tenga que elegir nada),
+  pega una URL publica directa a un .mp3 en AUDIO_URL mas abajo en el
+  script.
+
+  Opcion C: si quieres que quede incrustada pero no tienes una URL
+  publica, conviertela a Base64 y pegala en AUDIO_BASE64 mas abajo en
+  el script (esto genera un archivo mas pesado pero funciona siempre,
+  sin depender de internet).
+
+  Si configuras AUDIO_URL o AUDIO_BASE64, esas tienen prioridad y el
+  boton ya no abrira el selector de archivos — reproducira esa cancion
+  directamente.
+-->
+<audio id="bg-audio" loop preload="none"></audio>
+<input type="file" id="audio-file-input" accept="audio/*" style="display:none" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ======================================================================
+  // CONFIGURACION DE MUSICA — pega aqui tu cancion o trozo en loop
+  // ======================================================================
+  // Opcion A: nombre o ruta de un archivo .mp3.
+  //   - Uso LOCAL (recomendado para tu caso): guarda tu cancion (ej.
+  //     "pied.mp3" o "Eres TuCut.mp3") en la MISMA CARPETA que este
+  //     archivo .html y escribe aqui solo el nombre del archivo, tal
+  //     cual, entre comillas. Ejemplo:
+  //         var AUDIO_URL = "Eres TuCut.mp3";
+  //     Al abrir el .html haciendo doble clic (o con "Abrir con" tu
+  //     navegador), el navegador la va a leer directamente desde tu
+  //     compu. El boton ♪ la reproduce/pausa en loop.
+  //   - Uso ONLINE: tambien puedes pegar aqui una URL publica completa
+  //     a un .mp3 (https://...). OJO: si compartes el enlace de esta
+  //     pagina publicada, una ruta local como "pied.mp3" NO va a sonar
+  //     para quien lo abra desde ahi, porque el archivo no viaja con el
+  //     enlace — solo funciona cuando el HTML y el mp3 estan juntos en
+  //     la misma carpeta de una computadora. Para que suene siempre,
+  //     sin importar donde se abra, usa AUDIO_BASE64 mas abajo en su lugar.
+  var AUDIO_URL = "Eres tuCut.mp3";
+  // Opcion B (recomendada): pega aqui el texto Base64 completo de tu
+  // archivo, empezando con "data:audio/mpeg;base64,....".
+  // Vas a ver las instrucciones completas en el comentario HTML arriba
+  // del reproductor.
+  var AUDIO_BASE64 = "";
+  // Volumen inicial (0.0 a 1.0)
+  var AUDIO_VOLUME = 0.5;
+  // ======================================================================
+
+  var container = document.getElementById('canvas-container');
+  var loadingEl = document.getElementById('loading');
+
+  // se activa mientras suena la cancion (hace bailar a las cometas)
+  var cometsActive = false;
+
+  // ---------- Music player ----------
+  (function setupMusic() {
+    var audioEl = document.getElementById('bg-audio');
+    var btn = document.getElementById('music-btn');
+    var fileInput = document.getElementById('audio-file-input');
+    var configuredSource = AUDIO_URL || AUDIO_BASE64;
+    var hasSong = false;
+
+    function attachAudioEvents() {
+      audioEl.addEventListener('play', function () {
+        btn.classList.add('playing');
+        btn.textContent = '♫';
+        btn.title = 'Pausar musica';
+        cometsActive = true;
+      });
+      audioEl.addEventListener('pause', function () {
+        btn.classList.remove('playing');
+        btn.textContent = '♪';
+        btn.title = 'Reproducir musica';
+        cometsActive = false;
+      });
+
+      // La cancion esta en loop, asi que "ended" nunca dispara solo:
+      // detectamos que esta por terminar (o que acaba de reiniciarse)
+      // mirando el tiempo restante, y ahi disparamos pulsar + supernova.
+      var endEffectArmed = true;
+      audioEl.addEventListener('timeupdate', function () {
+        if (!audioEl.duration || isNaN(audioEl.duration)) return;
+        var remaining = audioEl.duration - audioEl.currentTime;
+        if (remaining < 0.35 && endEffectArmed) {
+          endEffectArmed = false;
+          triggerEndEffect();
+        }
+        if (audioEl.currentTime < 0.6) {
+          endEffectArmed = true;
+        }
+      });
+    }
+    attachAudioEvents();
+
+    function playPause() {
+      if (audioEl.paused) {
+        // activamos las cometas al toque del boton (no solo cuando el
+        // navegador confirma que el audio ya esta sonando), para que
+        // aparezcan aunque el evento "play" del audio se retrase o falle
+        cometsActive = true;
+        audioEl.play().catch(function () {
+          btn.title = 'No se pudo reproducir el audio';
+          cometsActive = false;
+        });
+      } else {
+        cometsActive = false;
+        audioEl.pause();
+      }
+    }
+
+    if (configuredSource) {
+      // A song is already baked into the code (URL or Base64) — the
+      // button just plays/pauses it directly.
+      audioEl.src = configuredSource;
+      audioEl.volume = AUDIO_VOLUME;
+      audioEl.loop = true;
+      hasSong = true;
+      btn.title = 'Reproducir musica';
+      btn.addEventListener('click', playPause);
+    } else {
+      // No song baked in yet: the button opens your computer's file
+      // picker so you can choose an mp3 straight from your PC.
+      btn.style.opacity = '0.85';
+      btn.title = 'Elegir cancion desde tu computadora (mp3)';
+
+      btn.addEventListener('click', function () {
+        if (hasSong) {
+          playPause();
+        } else {
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        var objectUrl = URL.createObjectURL(file);
+        audioEl.src = objectUrl;
+        audioEl.volume = AUDIO_VOLUME;
+        audioEl.loop = true;
+        hasSong = true;
+        cometsActive = true;
+        audioEl.play().catch(function () {
+          btn.title = 'Toca de nuevo para reproducir';
+          cometsActive = false;
+        });
+      });
+    }
+  })();
+
+  // ---------- Basic scene setup ----------
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.FogExp2(0x000000, 0.0035);
+
+  var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(0, 55, 210);
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  // ---------- Camera controls ----------
+  // Three layers combine into the final camera orientation:
+  //   base       -> slow automatic rotation over time
+  //   dragOffset -> accumulated rotation from click-drag / touch-drag (persists)
+  //   hoverOffset-> live offset that follows the cursor position (moves up/down
+  //                 and side to side in 3D as soon as you touch it with the
+  //                 mouse, even without clicking) — resets toward 0 when the
+  //                 cursor leaves, drag takes over while a click/touch is held.
+  function isNarrowScreen() { return window.innerWidth / window.innerHeight < 0.75; }
+
+  var baseTheta = 0.0;
+  var basePhi = 1.15;
+  var dragThetaOffset = 0;
+  var dragPhiOffset = 0;
+  var hoverThetaOffset = 0;
+  var hoverPhiOffset = 0;
+  var hoverActive = false;
+
+  var camRadius = isNarrowScreen() ? 300 : 220;
+  var camAngle = { theta: baseTheta, phi: basePhi };
+  var targetTheta = baseTheta, targetPhi = basePhi;
+
+  var isDragging = false;
+  var lastX = 0, lastY = 0;
+
+  function clampPhiOffset(dragOff, hoverOff) {
+    var total = basePhi + dragOff + hoverOff;
+    var clamped = Math.max(0.28, Math.min(Math.PI - 0.28, total));
+    return clamped - basePhi - hoverOff;
+  }
+
+  function onPointerDown(x, y) {
+    isDragging = true;
+    lastX = x; lastY = y;
+  }
+  function onPointerDrag(x, y) {
+    if (!isDragging) return;
+    var dx = x - lastX;
+    var dy = y - lastY;
+    lastX = x; lastY = y;
+    dragThetaOffset -= dx * 0.006;
+    dragPhiOffset -= dy * 0.006;
+    dragPhiOffset = clampPhiOffset(dragPhiOffset, hoverPhiOffset);
+  }
+  function onPointerUp() { isDragging = false; }
+
+  // Continuous "move with the cursor" parallax — works on hover, no click needed.
+  function onHoverMove(x, y) {
+    if (isDragging) return;
+    hoverActive = true;
+    var nx = (x / window.innerWidth) * 2 - 1;   // -1 .. 1
+    var ny = (y / window.innerHeight) * 2 - 1;  // -1 .. 1 (top to bottom)
+    hoverThetaOffset = nx * 0.5;
+    hoverPhiOffset = -ny * 0.4; // moving cursor up tilts the view up
+  }
+  function onHoverLeave() {
+    hoverActive = false;
+    hoverThetaOffset = 0;
+    hoverPhiOffset = 0;
+  }
+
+  renderer.domElement.addEventListener('mousedown', function (e) { onPointerDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function (e) {
+    onPointerDrag(e.clientX, e.clientY);
+    onHoverMove(e.clientX, e.clientY);
+  });
+  window.addEventListener('mouseup', onPointerUp);
+  renderer.domElement.addEventListener('mouseleave', onHoverLeave);
+
+  // Touch: single finger drags/moves the view up-down & side to side in 3D;
+  // two fingers pinch to zoom in/out.
+  var pinchStartDist = null;
+  var pinchStartRadius = camRadius;
+
+  function touchDistance(t0, t1) {
+    var dx = t0.clientX - t1.clientX;
+    var dy = t0.clientY - t1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  renderer.domElement.addEventListener('touchstart', function (e) {
+  if (e.touches.length === 1) {
+    onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+  } else if (e.touches.length === 2) {
+    e.preventDefault();
+    isDragging = false;
+    pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+    pinchStartRadius = camRadius;
+  }
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', function (e) {
+  if (e.touches.length === 1) {
+    onPointerDrag(e.touches[0].clientX, e.touches[0].clientY);
+  } else if (e.touches.length === 2 && pinchStartDist) {
+    e.preventDefault();
+    var newDist = touchDistance(e.touches[0], e.touches[1]);
+    var scale = pinchStartDist / newDist;
+    camRadius = Math.max(90, Math.min(460, pinchStartRadius * scale));
+  }
+}, { passive: false });
+
+  renderer.domElement.addEventListener('touchend', function (e) {
+    onPointerUp();
+    if (e.touches.length < 2) pinchStartDist = null;
+  });
+
+  renderer.domElement.addEventListener('wheel', function (e) {
+    camRadius += e.deltaY * 0.08;
+    camRadius = Math.max(90, Math.min(460, camRadius));
+  }, { passive: true });
+
+  // ---------- Lighting ----------
+  var ambient = new THREE.AmbientLight(0x1a1a2a, 0.6);
+  scene.add(ambient);
+
+  var rimLight = new THREE.PointLight(0xffdd55, 2.2, 900);
+  rimLight.position.set(180, 90, 140);
+  scene.add(rimLight);
+
+  var rimLight2 = new THREE.PointLight(0xffaa33, 1.1, 900);
+  rimLight2.position.set(-160, -60, -120);
+  scene.add(rimLight2);
+
+  var softBlue = new THREE.PointLight(0x2233ff, 0.35, 900);
+  softBlue.position.set(0, -200, 0);
+  scene.add(softBlue);
+
+  // ---------- Starfield ----------
+  function createStarfield() {
+    var starGeo = new THREE.BufferGeometry();
+    var count = 2400;
+    var positions = new Float32Array(count * 3);
+    for (var i = 0; i < count; i++) {
+      var r = 500 + Math.random() * 900;
+      var theta = Math.random() * Math.PI * 2;
+      var phi = Math.acos(2 * Math.random() - 1);
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    var starMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 1.4,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.75
+    });
+    var stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
+    return stars;
+  }
+  var starfield = createStarfield();
+
+  // ---------- Planet group ----------
+  var planetGroup = new THREE.Group();
+  scene.add(planetGroup);
+
+  var PLANET_RADIUS = 34;
+
+  // Core black planet
+  var planetGeo = new THREE.SphereGeometry(PLANET_RADIUS, 96, 96);
+  var planetMat = new THREE.MeshStandardMaterial({
+    color: 0x040404,
+    roughness: 0.35,
+    metalness: 0.75,
+    envMapIntensity: 1.0
+  });
+  var planet = new THREE.Mesh(planetGeo, planetMat);
+  planetGroup.add(planet);
+
+  // Subtle golden rim-glow shell (fresnel-ish trick using BackSide)
+  var glowGeo = new THREE.SphereGeometry(PLANET_RADIUS * 1.045, 96, 96);
+  var glowMat = new THREE.ShaderMaterial({
+    uniforms: {
+      glowColor: { value: new THREE.Color(0xffcc33) }
+    },
+    vertexShader: [
+      'varying vec3 vNormal;',
+      'void main() {',
+      '  vNormal = normalize(normalMatrix * normal);',
+      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform vec3 glowColor;',
+      'varying vec3 vNormal;',
+      'void main() {',
+      '  float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.5);',
+      '  gl_FragColor = vec4(glowColor, intensity * 0.55);',
+      '}'
+    ].join('\n'),
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false
+  });
+  var glowShell = new THREE.Mesh(glowGeo, glowMat);
+  planetGroup.add(glowShell);
+
+  // ---------- Rings (canvas-texture based, Saturn-like bands) ----------
+  function createRingTexture() {
+    var size = 512;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = 2;
+    var ctx = canvas.getContext('2d');
+    var grad = ctx.createLinearGradient(0, 0, size, 0);
+    var stops = [
+      [0.0, 'rgba(255,221,85,0.0)'],
+      [0.06, 'rgba(255,221,85,0.35)'],
+      [0.12, 'rgba(255,238,150,0.75)'],
+      [0.18, 'rgba(255,200,60,0.25)'],
+      [0.24, 'rgba(255,221,85,0.65)'],
+      [0.32, 'rgba(255,180,40,0.15)'],
+      [0.40, 'rgba(255,238,150,0.85)'],
+      [0.48, 'rgba(255,200,60,0.30)'],
+      [0.56, 'rgba(255,221,85,0.70)'],
+      [0.64, 'rgba(255,180,40,0.20)'],
+      [0.72, 'rgba(255,238,180,0.90)'],
+      [0.80, 'rgba(255,200,60,0.35)'],
+      [0.88, 'rgba(255,221,85,0.55)'],
+      [0.95, 'rgba(255,221,85,0.15)'],
+      [1.0, 'rgba(255,221,85,0.0)']
+    ];
+    for (var i = 0; i < stops.length; i++) {
+      grad.addColorStop(stops[i][0], stops[i][1]);
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, 2);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function createRing(innerR, outerR, tex, opacity) {
+    var geo = new THREE.RingGeometry(innerR, outerR, 128, 1);
+    // remap UVs radially so the gradient texture reads across the ring width
+    var pos = geo.attributes.position;
+    var uv = geo.attributes.uv;
+    var v3 = new THREE.Vector3();
+    for (var i = 0; i < pos.count; i++) {
+      v3.fromBufferAttribute(pos, i);
+      var dist = v3.length();
+      var u = (dist - innerR) / (outerR - innerR);
+      uv.setXY(i, u, 0.5);
+    }
+    var mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = Math.PI / 2;
+    return mesh;
+  }
+
+  var ringTex = createRingTexture();
+  var ringGroup = new THREE.Group();
+  ringGroup.add(createRing(PLANET_RADIUS * 1.35, PLANET_RADIUS * 2.6, ringTex, 0.95));
+  ringGroup.add(createRing(PLANET_RADIUS * 2.65, PLANET_RADIUS * 3.05, ringTex, 0.5));
+  // Saturn's real tilt ~26.7 degrees
+  ringGroup.rotation.x = THREE.MathUtils ? THREE.MathUtils.degToRad(-26.7) : (-26.7 * Math.PI / 180);
+  ringGroup.rotation.z = 0.12;
+  planetGroup.add(ringGroup);
+
+  // ---------- Flower sprites ----------
+  function createFlowerTexture() {
+    var size = 128;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var cx = size / 2, cy = size / 2;
+    var petals = 5;
+    var petalLen = 40;
+    var petalWidth = 22;
+
+    ctx.translate(cx, cy);
+    for (var i = 0; i < petals; i++) {
+      ctx.save();
+      ctx.rotate((i / petals) * Math.PI * 2);
+      var grad = ctx.createRadialGradient(0, -petalLen * 0.5, 2, 0, -petalLen * 0.5, petalLen * 0.8);
+      grad.addColorStop(0, 'rgba(255,244,180,1)');
+      grad.addColorStop(0.55, 'rgba(255,213,60,1)');
+      grad.addColorStop(1, 'rgba(255,180,20,0.85)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(petalWidth, -petalLen * 0.5, 0, -petalLen);
+      ctx.quadraticCurveTo(-petalWidth, -petalLen * 0.5, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+    // center
+    var centerGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 14);
+    centerGrad.addColorStop(0, 'rgba(255,255,230,1)');
+    centerGrad.addColorStop(1, 'rgba(255,190,40,0.9)');
+    ctx.fillStyle = centerGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var flowerTex = createFlowerTexture();
+
+  // A second flower texture variant (slightly different palette) for visual variety
+  function createFlowerTexture2() {
+    var size = 128;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var cx = size / 2, cy = size / 2;
+    var petals = 6;
+    var petalLen = 34;
+    var petalWidth = 17;
+
+    ctx.translate(cx, cy);
+    for (var i = 0; i < petals; i++) {
+      ctx.save();
+      ctx.rotate((i / petals) * Math.PI * 2);
+      var grad = ctx.createRadialGradient(0, -petalLen * 0.5, 2, 0, -petalLen * 0.5, petalLen * 0.8);
+      grad.addColorStop(0, 'rgba(255,250,210,1)');
+      grad.addColorStop(0.55, 'rgba(255,225,100,1)');
+      grad.addColorStop(1, 'rgba(255,170,10,0.8)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(petalWidth, -petalLen * 0.5, 0, -petalLen);
+      ctx.quadraticCurveTo(-petalWidth, -petalLen * 0.5, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+    var centerGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 10);
+    centerGrad.addColorStop(0, 'rgba(255,255,240,1)');
+    centerGrad.addColorStop(1, 'rgba(255,205,60,0.9)');
+    ctx.fillStyle = centerGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var flowerTex2 = createFlowerTexture2();
+  var flowerTextures = [flowerTex, flowerTex2];
+
+  var flowers = [];
+  var FLOWER_COUNT = 55;
+  var flowerOrbitGroup = new THREE.Group();
+  scene.add(flowerOrbitGroup);
+
+  for (var f = 0; f < FLOWER_COUNT; f++) {
+    var mat = new THREE.SpriteMaterial({
+      map: flowerTextures[f % flowerTextures.length],
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    var sprite = new THREE.Sprite(mat);
+    var scale = 3.5 + Math.random() * 6.5;
+    sprite.scale.set(scale, scale, 1);
+
+    var radius = PLANET_RADIUS * (3.3 + Math.random() * 4.2);
+    var speed = (0.035 + Math.random() * 0.07) * (Math.random() < 0.5 ? 1 : -1);
+    var angle = Math.random() * Math.PI * 2;
+    var tiltOffset = (Math.random() - 0.5) * 1.3; // vertical wobble amplitude
+    var tiltSpeed = 0.3 + Math.random() * 0.7;
+    var baseTiltAngle = THREE.MathUtils ? THREE.MathUtils.degToRad(-26.7 + (Math.random() - 0.5) * 50) : 0;
+
+    flowers.push({
+      sprite: sprite,
+      radius: radius,
+      speed: speed,
+      angle: angle,
+      tiltOffset: tiltOffset,
+      tiltSpeed: tiltSpeed,
+      tiltPhase: Math.random() * Math.PI * 2,
+      baseTiltAngle: baseTiltAngle,
+      pulseSpeed: 0.6 + Math.random() * 1.2,
+      pulsePhase: Math.random() * Math.PI * 2,
+      baseScale: scale
+    });
+    flowerOrbitGroup.add(sprite);
+  }
+
+  // ---------- Sparkle particles (twinkling golden dust around everything) ----------
+  function createSparkleTexture() {
+    var size = 64;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(255,250,220,1)');
+    grad.addColorStop(0.35, 'rgba(255,221,100,0.8)');
+    grad.addColorStop(1, 'rgba(255,200,60,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var sparkleTex = createSparkleTexture();
+
+  var SPARKLE_COUNT = 180;
+  var sparkleGeo = new THREE.BufferGeometry();
+  var sparklePositions = new Float32Array(SPARKLE_COUNT * 3);
+  var sparkleData = [];
+  for (var sp = 0; sp < SPARKLE_COUNT; sp++) {
+    var sRadius = PLANET_RADIUS * (2.8 + Math.random() * 6.5);
+    var sAngle = Math.random() * Math.PI * 2;
+    var sHeight = (Math.random() - 0.5) * PLANET_RADIUS * 5;
+    sparkleData.push({
+      radius: sRadius,
+      angle: sAngle,
+      height: sHeight,
+      speed: (0.015 + Math.random() * 0.05) * (Math.random() < 0.5 ? 1 : -1),
+      twinkleSpeed: 1 + Math.random() * 3,
+      twinklePhase: Math.random() * Math.PI * 2
+    });
+    sparklePositions[sp * 3] = Math.cos(sAngle) * sRadius;
+    sparklePositions[sp * 3 + 1] = sHeight;
+    sparklePositions[sp * 3 + 2] = Math.sin(sAngle) * sRadius;
+  }
+  sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePositions, 3));
+  var sparkleMat = new THREE.PointsMaterial({
+    map: sparkleTex,
+    size: 4.5,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0.85,
+    sizeAttenuation: true
+  });
+  var sparkles = new THREE.Points(sparkleGeo, sparkleMat);
+  scene.add(sparkles);
+
+  // ---------- Textura de brillo generica (para cometas y efecto final) ----------
+  function hexToRgb(hex) {
+    var v = parseInt(hex.replace('#', ''), 16);
+    return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+  }
+  function createGlowTexture(colorHex, size) {
+    size = size || 128;
+    var rgb = hexToRgb(colorHex);
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.18, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',1)');
+    grad.addColorStop(0.55, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0.45)');
+    grad.addColorStop(1, 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // ---------- Cometas: aparecen y bailan mientras suena la cancion ----------
+  var cometConfigs = [
+    { color: '#39ff8c' }, // verde
+    { color: '#c9a6ff' }  // lila
+  ];
+  var COMET_TRAIL_LEN = 9;
+  var cometsGroup = new THREE.Group();
+  scene.add(cometsGroup);
+  var comets = [];
+
+  for (var cIdx = 0; cIdx < cometConfigs.length; cIdx++) {
+    var cometTex = createGlowTexture(cometConfigs[cIdx].color, 128);
+    var headMat = new THREE.SpriteMaterial({
+      map: cometTex, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, opacity: 0
+    });
+    var head = new THREE.Sprite(headMat);
+    var cometBaseScale = 10 + cIdx * 1.4;
+    head.scale.set(cometBaseScale, cometBaseScale, 1);
+    cometsGroup.add(head);
+
+    var cometTrail = [];
+    for (var tIdx = 0; tIdx < COMET_TRAIL_LEN; tIdx++) {
+      var trailMat = new THREE.SpriteMaterial({
+        map: cometTex, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, opacity: 0
+      });
+      var trailSprite = new THREE.Sprite(trailMat);
+      cometsGroup.add(trailSprite);
+      cometTrail.push(trailSprite);
+    }
+
+    comets.push({
+      head: head,
+      trail: cometTrail,
+      history: [{ x: 0, y: 0, z: 0 }],
+      baseScale: cometBaseScale,
+      baseRadius: 90 + cIdx * 55,
+      opacity: 0,
+      p: {
+        radius: 90 + cIdx * 55,
+        radiusVar: 20 + Math.random() * 15,
+        rSpeed: 0.15 + Math.random() * 0.1,
+        rPhase: Math.random() * Math.PI * 2,
+        // direcciones e inicios opuestos para que las 2 verdes no viajen "pegadas"
+        speedA: (0.32 + Math.random() * 0.10) * (cIdx % 2 === 0 ? 1 : -1),
+        speedB: (0.5 + Math.random() * 0.10) * (cIdx % 2 === 0 ? 1 : -1),
+        phaseA: cIdx * (Math.PI * 2 / 3) + Math.random() * 0.5,
+        phaseB: Math.random() * Math.PI * 2,
+        vertAmp: (55 + cIdx * 15) * (cIdx % 2 === 0 ? 1 : -1),
+        bobSpeed: 1.2 + Math.random() * 0.6,
+        bobPhase: Math.random() * Math.PI * 2
+      }
+    });
+  }
+
+  function updateComets(dt, t) {
+    var targetOp = cometsActive ? 1 : 0;
+    for (var i = 0; i < comets.length; i++) {
+      var c = comets[i];
+      c.opacity += (targetOp - c.opacity) * Math.min(1, dt * 3.2);
+      var visible = c.opacity > 0.004;
+      c.head.visible = visible;
+      for (var k = 0; k < c.trail.length; k++) c.trail[k].visible = visible;
+      if (!visible) continue;
+
+      var p = c.p;
+      var ang1 = t * p.speedA + p.phaseA;
+      var ang2 = t * p.speedB + p.phaseB;
+      var r = p.radius + Math.sin(t * p.rSpeed + p.rPhase) * p.radiusVar;
+      var x = r * Math.sin(ang1) * Math.cos(ang2 * 0.55);
+      var y = p.vertAmp * Math.sin(ang2) + Math.sin(t * p.bobSpeed + p.bobPhase) * 9;
+      var z = r * Math.cos(ang1) * Math.cos(ang2 * 0.55);
+
+      c.head.position.set(x, y, z);
+      c.head.material.opacity = c.opacity * 0.95;
+      var headScale = c.baseScale * (1 + Math.sin(t * 4 + p.phaseA) * 0.15);
+      c.head.scale.set(headScale, headScale, 1);
+
+      c.history.unshift({ x: x, y: y, z: z });
+      if (c.history.length > c.trail.length + 2) c.history.length = c.trail.length + 2;
+
+      for (var k2 = 0; k2 < c.trail.length; k2++) {
+        var hp = c.history[Math.min(k2 + 1, c.history.length - 1)];
+        c.trail[k2].position.set(hp.x, hp.y, hp.z);
+        var fade = 1 - (k2 + 1) / (c.trail.length + 1);
+        c.trail[k2].material.opacity = c.opacity * fade * 0.65;
+        var sc = c.baseScale * (0.9 - 0.08 * k2);
+        if (sc < 1) sc = 1;
+        c.trail[k2].scale.set(sc, sc, 1);
+      }
+    }
+  }
+
+  // ---------- Efecto de final de cancion: pulsar que colapsa -> supernova ----------
+  var fxState = 'idle'; // idle | pulsar | supernova
+  var fxTimer = 0;
+  var PULSAR_DURATION = 1.8;
+  var SUPERNOVA_DURATION = 2.6;
+
+  var pulsarLight = new THREE.PointLight(0xffffff, 0, 750);
+  scene.add(pulsarLight);
+
+  var flashTex = createGlowTexture('#ffffff', 128);
+  var flashMat = new THREE.SpriteMaterial({
+    map: flashTex, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, opacity: 0
+  });
+  var flashSprite = new THREE.Sprite(flashMat);
+  scene.add(flashSprite);
+
+  function createRingFlashTexture() {
+    var size = 256;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.30, size / 2, size / 2, size * 0.5);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.55, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.75, 'rgba(180,210,255,0.5)');
+    grad.addColorStop(1, 'rgba(180,210,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var ringFlashTex = createRingFlashTexture();
+  var shockwaves = [];
+  function spawnShockwave(delay) {
+    var mat = new THREE.SpriteMaterial({
+      map: ringFlashTex, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, opacity: 0
+    });
+    var s = new THREE.Sprite(mat);
+    scene.add(s);
+    shockwaves.push({ sprite: s, age: -(delay || 0), duration: 2.2 });
+  }
+
+  var novaTextures = [
+    createGlowTexture('#ffffff'),
+    createGlowTexture('#ffe9a8'),
+    createGlowTexture('#9fd8ff'),
+    createGlowTexture('#c9a6ff')
+  ];
+  var novaParticles = [];
+  function spawnNova() {
+    var count = 90;
+    for (var i = 0; i < count; i++) {
+      var tex = novaTextures[Math.floor(Math.random() * novaTextures.length)];
+      var mat = new THREE.SpriteMaterial({
+        map: tex, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, opacity: 0
+      });
+      var sprite = new THREE.Sprite(mat);
+      scene.add(sprite);
+      var theta = Math.random() * Math.PI * 2;
+      var phi = Math.acos(2 * Math.random() - 1);
+      var speed = 60 + Math.random() * 120;
+      novaParticles.push({
+        sprite: sprite,
+        age: 0,
+        duration: 2.0 + Math.random() * 1.4,
+        baseScale: 3 + Math.random() * 5,
+        velocity: new THREE.Vector3(
+          Math.sin(phi) * Math.cos(theta) * speed,
+          Math.cos(phi) * speed,
+          Math.sin(phi) * Math.sin(theta) * speed
+        )
+      });
+    }
+  }
+
+  function triggerEndEffect() {
+    if (fxState !== 'idle') return;
+    fxState = 'pulsar';
+    fxTimer = 0;
+  }
+
+  function updateEndEffect(dt) {
+    if (fxState === 'idle') return;
+    fxTimer += dt;
+
+    if (fxState === 'pulsar') {
+      var tp = fxTimer / PULSAR_DURATION;
+      var pulseFreq = 3 + tp * 14; // el latido se acelera hacia el colapso
+      var pulse = Math.max(0, Math.sin(fxTimer * pulseFreq));
+      pulsarLight.intensity = pulse * pulse * (1 + tp * 3) * 3.5;
+
+      // las cometas son arrastradas hacia el centro, como atrapadas en el colapso
+      for (var i = 0; i < comets.length; i++) {
+        comets[i].p.radius = Math.max(20, comets[i].baseRadius - tp * tp * comets[i].baseRadius * 0.75);
+      }
+
+      if (tp >= 1) {
+        fxState = 'supernova';
+        fxTimer = 0;
+        pulsarLight.intensity = 0;
+        spawnNova();
+        spawnShockwave(0);
+        spawnShockwave(0.15);
+        spawnShockwave(0.32);
+      }
+      return;
+    }
+
+    if (fxState === 'supernova') {
+      var ts = fxTimer / SUPERNOVA_DURATION;
+
+      var flashEnv = ts < 0.08 ? ts / 0.08 : Math.max(0, 1 - (ts - 0.08) / 0.5);
+      flashMat.opacity = flashEnv * 0.95;
+      var flashScale = 20 + ts * 260;
+      flashSprite.scale.set(flashScale, flashScale, 1);
+
+      for (var si = shockwaves.length - 1; si >= 0; si--) {
+        var sw = shockwaves[si];
+        sw.age += dt;
+        if (sw.age < 0) continue;
+        var swT = sw.age / sw.duration;
+        var scale = 10 + swT * 480;
+        sw.sprite.scale.set(scale, scale, 1);
+        sw.sprite.material.opacity = Math.max(0, 1 - swT) * 0.85;
+        if (swT >= 1) {
+          scene.remove(sw.sprite);
+          sw.sprite.material.dispose();
+          shockwaves.splice(si, 1);
+        }
+      }
+
+      for (var ni = novaParticles.length - 1; ni >= 0; ni--) {
+        var np = novaParticles[ni];
+        np.age += dt;
+        var lifeT = np.age / np.duration;
+        np.velocity.multiplyScalar(Math.pow(0.92, dt * 10));
+        np.sprite.position.addScaledVector(np.velocity, dt);
+        var popIn = Math.min(1, np.age / 0.15);
+        var fadeOut = lifeT > 0.5 ? 1 - (lifeT - 0.5) / 0.5 : 1;
+        var env = Math.max(0, Math.min(1, Math.min(popIn, fadeOut)));
+        np.sprite.material.opacity = env;
+        var sc2 = np.baseScale * (0.5 + env * 1.1);
+        np.sprite.scale.set(sc2, sc2, 1);
+        if (np.age >= np.duration) {
+          scene.remove(np.sprite);
+          np.sprite.material.dispose();
+          novaParticles.splice(ni, 1);
+        }
+      }
+
+      if (ts >= 1 && shockwaves.length === 0 && novaParticles.length === 0) {
+        fxState = 'idle';
+        flashMat.opacity = 0;
+        for (var r = 0; r < comets.length; r++) {
+          comets[r].p.radius = comets[r].baseRadius;
+        }
+      }
+    }
+  }
+
+  // ---------- Love text sprites ----------
+  var loveTexts = [
+    "Te amo",
+    "Eres todo para mi",
+    "Mi amor",
+    "Siempre juntos",
+    "Eres mi universo",
+    "Contigo hasta la luna",
+    "Eres mi todo",
+    "Te adoro",
+    "Mi persona favorita",
+    "Para siempre tu",
+    "Eres mi hogar",
+    "Mi razon de sonreir",
+    "Te elijo siempre",
+    "Eres mi paz",
+    "Contigo, para siempre",
+    "Mi mejor equipo",
+    "Eres mi calma",
+    "No hay nadie como tu",
+    "Mi lugar favorito eres tu",
+    "Gracias por existir",
+    "Eres mi estrella",
+    "Te quiero infinito",
+    "Mi corazon es tuyo",
+    "Contigo todo tiene sentido",
+    "Eres mi persona",
+    "Te amo mas cada dia",
+    "Mi mayor bendicion",
+    "Eres mi sueño cumplido",
+    "Contigo aprendi a amar",
+    "Mi complice de vida",
+    "Eres mi alegria",
+    "Te amare siempre",
+    "Mi amor eterno",
+    "Eres mi mejor decision",
+    "Contigo soy feliz",
+    "Mi todo eres tu",
+    "Eres unica",
+    "Te llevo en el corazon",
+    "Mi amor infinito",
+    "Eres mi luz",
+    "Gracias por tu amor",
+    "Contigo quiero envejecer",
+    "Mi persona para siempre",
+    "Eres mi sonrisa favorita",
+    "Te amo con todo mi ser",
+    "Mi razon de ser",
+    "Eres mi milagro",
+    "Contigo todo es mejor",
+    "Mi amor mas grande",
+    "Eres mi destino",
+    "Te amo hoy y siempre"
+  ];
+
+  function createTextTexture(text) {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var fontSize = 52;
+    ctx.font = '700 ' + fontSize + 'px Georgia, serif';
+    var metrics = ctx.measureText(text);
+    var padding = 46;
+    canvas.width = Math.ceil(metrics.width) + padding * 2;
+    canvas.height = fontSize + padding;
+
+    ctx.font = '700 ' + fontSize + 'px Georgia, serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    var cx = canvas.width / 2;
+    var cy = canvas.height / 2;
+
+    // Soft dark plate behind the text for maximum legibility against any background
+    ctx.save();
+    var plateGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, canvas.width * 0.55);
+    plateGrad.addColorStop(0, 'rgba(10,8,0,0.55)');
+    plateGrad.addColorStop(0.7, 'rgba(10,8,0,0.25)');
+    plateGrad.addColorStop(1, 'rgba(10,8,0,0)');
+    ctx.fillStyle = plateGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    // Outer glow pass
+    ctx.shadowColor = 'rgba(255, 200, 40, 1)';
+    ctx.shadowBlur = 28;
+    ctx.fillStyle = 'rgba(255, 225, 110, 1)';
+    ctx.fillText(text, cx, cy);
+    ctx.fillText(text, cx, cy);
+
+    // Crisp bright core pass
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(255, 245, 200, 1)';
+    ctx.fillStyle = 'rgba(255, 253, 235, 1)';
+    ctx.fillText(text, cx, cy);
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return { tex: tex, aspect: canvas.width / canvas.height };
+  }
+
+  var textSprites = [];
+  var textOrbitGroup = new THREE.Group();
+  scene.add(textOrbitGroup);
+
+  for (var t = 0; t < loveTexts.length; t++) {
+    var texData = createTextTexture(loveTexts[t]);
+    var tmat = new THREE.SpriteMaterial({
+      map: texData.tex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.0
+    });
+    var tsprite = new THREE.Sprite(tmat);
+    var h = 10.5;
+    var w = h * texData.aspect;
+    tsprite.scale.set(w, h, 1);
+
+    var radius = PLANET_RADIUS * (5.0 + (t % 6) * 1.35 + Math.random() * 0.6);
+    var speed = (0.022 + Math.random() * 0.018) * (t % 2 === 0 ? 1 : -1);
+    var angle = (t / loveTexts.length) * Math.PI * 2;
+    var vertical = (Math.random() - 0.5) * PLANET_RADIUS * 3.4;
+    var bobSpeed = 0.25 + Math.random() * 0.35;
+    var bobPhase = Math.random() * Math.PI * 2;
+
+    textSprites.push({
+      sprite: tsprite,
+      radius: radius,
+      speed: speed,
+      angle: angle,
+      vertical: vertical,
+      bobSpeed: bobSpeed,
+      bobPhase: bobPhase,
+      fadeDelay: t * 0.35
+    });
+    textOrbitGroup.add(tsprite);
+  }
+
+  // ---------- Bouquets (clusters of flowers that bloom in, drift, and fade out) ----------
+  var bouquets = [];
+  var bouquetGroup = new THREE.Group();
+  scene.add(bouquetGroup);
+
+  var BOUQUET_COUNT = 14;
+  var FLOWERS_PER_BOUQUET = 6;
+
+  for (var b = 0; b < BOUQUET_COUNT; b++) {
+    var cluster = new THREE.Group();
+    var clusterFlowers = [];
+    for (var cf = 0; cf < FLOWERS_PER_BOUQUET; cf++) {
+      var cmat = new THREE.SpriteMaterial({
+        map: flowerTextures[cf % flowerTextures.length],
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0
+      });
+      var csprite = new THREE.Sprite(cmat);
+      var cscale = 6 + Math.random() * 4;
+      csprite.scale.set(cscale, cscale, 1);
+      // arrange in a loose bouquet shape: one center + ring of others
+      var localAngle = (cf / FLOWERS_PER_BOUQUET) * Math.PI * 2;
+      var localR = cf === 0 ? 0 : (5 + Math.random() * 4);
+      csprite.position.set(
+        Math.cos(localAngle) * localR,
+        Math.sin(localAngle) * localR * 0.6 + (cf === 0 ? 3 : 0),
+        (Math.random() - 0.5) * 2
+      );
+      cluster.add(csprite);
+      clusterFlowers.push({ sprite: csprite, baseScale: cscale });
+    }
+    bouquetGroup.add(cluster);
+
+    var orbitRadius = PLANET_RADIUS * (4.2 + Math.random() * 5.5);
+    var orbitAngle = Math.random() * Math.PI * 2;
+    var orbitSpeed = (0.015 + Math.random() * 0.025) * (Math.random() < 0.5 ? 1 : -1);
+    var vertical = (Math.random() - 0.5) * PLANET_RADIUS * 3.6;
+
+    bouquets.push({
+      group: cluster,
+      flowers: clusterFlowers,
+      orbitRadius: orbitRadius,
+      orbitAngle: orbitAngle,
+      orbitSpeed: orbitSpeed,
+      vertical: vertical,
+      bobSpeed: 0.2 + Math.random() * 0.3,
+      bobPhase: Math.random() * Math.PI * 2,
+      cyclePeriod: 12 + Math.random() * 8,
+      cycleOffset: (b / BOUQUET_COUNT) * (12 + 8)
+    });
+  }
+
+  // ---------- Double-tap burst: yellow flowers & hearts ----------
+  function createHeartTexture() {
+    var size = 128;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    var cx = size / 2, cy = size / 2 + 8;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1.9, 1.9);
+    ctx.beginPath();
+    ctx.moveTo(0, 10);
+    ctx.bezierCurveTo(-18, -12, -34, 4, 0, 30);
+    ctx.bezierCurveTo(34, 4, 18, -12, 0, 10);
+    ctx.closePath();
+
+    var grad = ctx.createRadialGradient(0, 2, 2, 0, 10, 34);
+    grad.addColorStop(0, 'rgba(255,250,215,1)');
+    grad.addColorStop(0.5, 'rgba(255,214,60,1)');
+    grad.addColorStop(1, 'rgba(255,175,20,0.9)');
+    ctx.fillStyle = grad;
+    ctx.shadowColor = 'rgba(255, 210, 60, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.restore();
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var heartTex = createHeartTexture();
+  // hearts appear a bit more often than flowers in the burst
+  var burstTextures = [heartTex, heartTex, flowerTex, heartTex, flowerTex2, heartTex];
+
+  var burstGroup = new THREE.Group();
+  scene.add(burstGroup);
+  var burstParticles = [];
+  var raycaster = new THREE.Raycaster();
+  var ndcVec = new THREE.Vector2();
+
+  function spawnBurst(clientX, clientY) {
+    ndcVec.x = (clientX / window.innerWidth) * 2 - 1;
+    ndcVec.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(ndcVec, camera);
+    var dist = camRadius * (0.55 + Math.random() * 0.15);
+    var origin = raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(dist));
+
+    var count = 9 + Math.floor(Math.random() * 6);
+    for (var i = 0; i < count; i++) {
+      var tex = burstTextures[Math.floor(Math.random() * burstTextures.length)];
+      var mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0
+      });
+      var sprite = new THREE.Sprite(mat);
+      var jitter = 3 + Math.random() * 4;
+      sprite.position.set(
+        origin.x + (Math.random() - 0.5) * jitter,
+        origin.y + (Math.random() - 0.5) * jitter,
+        origin.z + (Math.random() - 0.5) * jitter
+      );
+      var s = 4 + Math.random() * 4;
+      sprite.scale.set(0.1, 0.1, 1);
+      burstGroup.add(sprite);
+
+      var dirAngle = Math.random() * Math.PI * 2;
+      var dirUp = 0.55 + Math.random() * 0.6;
+      var speed = 9 + Math.random() * 14;
+      burstParticles.push({
+        sprite: sprite,
+        baseScale: s,
+        age: 0,
+        duration: 1.6 + Math.random() * 1.2,
+        velocity: new THREE.Vector3(
+          Math.cos(dirAngle) * speed * 0.5,
+          dirUp * speed,
+          Math.sin(dirAngle) * speed * 0.5
+        ),
+        drag: 0.9,
+        spin: (Math.random() - 0.5) * 2.2
+      });
+    }
+  }
+
+  var lastClickTime = 0;
+  renderer.domElement.addEventListener('dblclick', function (e) {
+    spawnBurst(e.clientX, e.clientY);
+  });
+
+  // Touch double-tap detection (separate from the drag/orbit touch handling above)
+  var tapStartX = 0, tapStartY = 0, tapStartTime = 0;
+  var lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+  var TAP_MOVE_LIMIT = 18;
+  var TAP_MAX_DURATION = 350;
+  var DOUBLE_TAP_WINDOW = 380;
+
+  renderer.domElement.addEventListener('touchstart', function (e) {
+    if (e.touches.length === 1) {
+      tapStartX = e.touches[0].clientX;
+      tapStartY = e.touches[0].clientY;
+      tapStartTime = performance.now();
+    }
+  }, { passive: true });
+
+  renderer.domElement.addEventListener('touchend', function (e) {
+    var touch = e.changedTouches && e.changedTouches[0];
+    if (!touch) return;
+    var dx = touch.clientX - tapStartX;
+    var dy = touch.clientY - tapStartY;
+    var moved = Math.sqrt(dx * dx + dy * dy);
+    var duration = performance.now() - tapStartTime;
+    if (moved > TAP_MOVE_LIMIT || duration > TAP_MAX_DURATION) return; // was a drag, not a tap
+
+    var now = performance.now();
+    var dxTap = touch.clientX - lastTapX;
+    var dyTap = touch.clientY - lastTapY;
+    var tapDist = Math.sqrt(dxTap * dxTap + dyTap * dyTap);
+
+    if (now - lastTapTime < DOUBLE_TAP_WINDOW && tapDist < 60) {
+      spawnBurst(touch.clientX, touch.clientY);
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+      lastTapX = touch.clientX;
+      lastTapY = touch.clientY;
+    }
+  });
+
+  // ---------- Resize (fully responsive: phones, tablets, desktop, rotation) ----------
+  function handleResize() {
+    var w = window.innerWidth;
+    var h = window.innerHeight;
+    camera.aspect = w / h;
+    // Narrow / portrait screens need a wider field of view and more distance
+    // so the rings, flowers and orbiting text still fit on screen.
+    var narrow = isNarrowScreen();
+    camera.fov = narrow ? 68 : 55;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    var desiredRadius = narrow ? 300 : 220;
+    // Only snap the radius if the user hasn't already zoomed manually far
+    // away from the previous default, so resizing mid-interaction feels smooth.
+    camRadius = Math.max(90, Math.min(460, desiredRadius));
+  }
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', handleResize);
+  handleResize();
+
+  // ---------- Animation loop ----------
+  var clock = new THREE.Clock();
+  var elapsedTotal = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    elapsedTotal += dt;
+
+    // Planet self-rotation
+    planet.rotation.y += dt * 0.18;
+    glowShell.rotation.y += dt * 0.05;
+
+    // Rings slow rotation
+    ringGroup.rotation.y += dt * 0.09;
+
+    // Flowers orbit
+    for (var i = 0; i < flowers.length; i++) {
+      var fl = flowers[i];
+      fl.angle += dt * fl.speed;
+      var wobble = Math.sin(elapsedTotal * fl.tiltSpeed + fl.tiltPhase) * fl.tiltOffset;
+      var x = Math.cos(fl.angle) * fl.radius;
+      var z = Math.sin(fl.angle) * fl.radius;
+      var y = Math.sin(fl.angle) * fl.radius * Math.tan(fl.baseTiltAngle) * -1 + wobble * PLANET_RADIUS * 0.5;
+      fl.sprite.position.set(x, y, z);
+      var pulsate = fl.baseScale * (1 + Math.sin(elapsedTotal * fl.pulseSpeed + fl.pulsePhase) * 0.18);
+      fl.sprite.scale.set(pulsate, pulsate, 1);
+      fl.sprite.material.rotation = elapsedTotal * 0.15 * (i % 2 === 0 ? 1 : -1);
+    }
+
+    // Sparkle dust: drift + twinkle
+    var sparklePosAttr = sparkleGeo.attributes.position;
+    for (var sIdx = 0; sIdx < sparkleData.length; sIdx++) {
+      var sd = sparkleData[sIdx];
+      sd.angle += dt * sd.speed;
+      sparklePosAttr.setX(sIdx, Math.cos(sd.angle) * sd.radius);
+      sparklePosAttr.setZ(sIdx, Math.sin(sd.angle) * sd.radius);
+      sparklePosAttr.setY(sIdx, sd.height + Math.sin(elapsedTotal * sd.twinkleSpeed + sd.twinklePhase) * 2.2);
+    }
+    sparklePosAttr.needsUpdate = true;
+    sparkleMat.opacity = 0.55 + Math.sin(elapsedTotal * 1.1) * 0.25;
+
+    // Love texts orbit + gentle fade-in and bobbing
+    for (var j = 0; j < textSprites.length; j++) {
+      var ts = textSprites[j];
+      ts.angle += dt * ts.speed;
+      var tx = Math.cos(ts.angle) * ts.radius;
+      var tz = Math.sin(ts.angle) * ts.radius;
+      var ty = ts.vertical + Math.sin(elapsedTotal * ts.bobSpeed + ts.bobPhase) * 6;
+      ts.sprite.position.set(tx, ty, tz);
+
+      var targetOpacity = 0.0;
+      if (elapsedTotal > ts.fadeDelay) {
+        var localT = elapsedTotal - ts.fadeDelay;
+        var cyclePos = (localT % 16) / 16; // slow breathing cycle, mostly bright
+        targetOpacity = 0.62 + 0.38 * Math.pow(Math.sin(cyclePos * Math.PI), 0.6);
+      }
+      ts.sprite.material.opacity += (targetOpacity - ts.sprite.material.opacity) * 0.04;
+
+      // face camera billboard is automatic for sprites
+    }
+
+    // Bouquets: bloom in, orbit, fade out, repeat
+    for (var bq = 0; bq < bouquets.length; bq++) {
+      var bo = bouquets[bq];
+      bo.orbitAngle += dt * bo.orbitSpeed;
+      var bx = Math.cos(bo.orbitAngle) * bo.orbitRadius;
+      var bz = Math.sin(bo.orbitAngle) * bo.orbitRadius;
+      var by = bo.vertical + Math.sin(elapsedTotal * bo.bobSpeed + bo.bobPhase) * 5;
+      bo.group.position.set(bx, by, bz);
+      bo.group.rotation.y += dt * 0.2;
+
+      var localCycle = ((elapsedTotal + bo.cycleOffset) % bo.cyclePeriod) / bo.cyclePeriod;
+      // envelope: fade in (0-0.15), hold bright (0.15-0.7), fade out (0.7-1.0)
+      var envelope;
+      if (localCycle < 0.15) {
+        envelope = localCycle / 0.15;
+      } else if (localCycle < 0.7) {
+        envelope = 1.0;
+      } else {
+        envelope = 1.0 - (localCycle - 0.7) / 0.3;
+      }
+      envelope = Math.max(0, Math.min(1, envelope));
+      var bloomScale = 0.6 + envelope * 0.5;
+
+      for (var cfi = 0; cfi < bo.flowers.length; cfi++) {
+        var cflower = bo.flowers[cfi];
+        cflower.sprite.material.opacity = envelope * 0.95;
+        var s = cflower.baseScale * bloomScale;
+        cflower.sprite.scale.set(s, s, 1);
+        cflower.sprite.material.rotation = elapsedTotal * 0.1 * (cfi % 2 === 0 ? 1 : -1);
+      }
+    }
+
+    // Double-tap burst particles: pop in, float outward/up, fade out
+    for (var biIdx = burstParticles.length - 1; biIdx >= 0; biIdx--) {
+      var bp = burstParticles[biIdx];
+      bp.age += dt;
+      var lifeT = bp.age / bp.duration;
+
+      bp.velocity.multiplyScalar(Math.pow(bp.drag, dt * 10));
+      bp.sprite.position.addScaledVector(bp.velocity, dt);
+      bp.sprite.material.rotation += bp.spin * dt;
+
+      var popIn = Math.min(1, bp.age / 0.22);
+      var fadeOut = lifeT > 0.55 ? 1 - (lifeT - 0.55) / 0.45 : 1;
+      var envelopeB = Math.max(0, Math.min(1, Math.min(popIn, fadeOut)));
+      bp.sprite.material.opacity = envelopeB;
+      var scaleNow = bp.baseScale * (0.4 + envelopeB * 0.9);
+      bp.sprite.scale.set(scaleNow, scaleNow, 1);
+
+      if (bp.age >= bp.duration) {
+        burstGroup.remove(bp.sprite);
+        bp.sprite.material.dispose();
+        burstParticles.splice(biIdx, 1);
+      }
+    }
+
+    // Cometas bailando (mientras suena la cancion) y efecto de final
+    updateComets(dt, elapsedTotal);
+    updateEndEffect(dt);
+
+    // Starfield gentle rotation
+    starfield.rotation.y += dt * 0.004;
+
+    // Camera controls: slow auto-rotation only when nobody is touching/hovering,
+    // combined with the drag offset (persists) and the hover offset (follows
+    // the cursor live, moving the view up/down and side to side in 3D).
+    if (!isDragging && !hoverActive) {
+      baseTheta += dt * 0.02;
+    }
+    targetTheta = baseTheta + dragThetaOffset + hoverThetaOffset;
+    targetPhi = basePhi + clampPhiOffset(dragPhiOffset, hoverPhiOffset) + hoverPhiOffset;
+
+    camAngle.theta += (targetTheta - camAngle.theta) * 0.08;
+    camAngle.phi += (targetPhi - camAngle.phi) * 0.08;
+
+    var sinPhi = Math.sin(camAngle.phi);
+    camera.position.x = camRadius * sinPhi * Math.sin(camAngle.theta);
+    camera.position.y = camRadius * Math.cos(camAngle.phi);
+    camera.position.z = camRadius * sinPhi * Math.cos(camAngle.theta);
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+
+  // Hide loading screen once first frame is ready
+  requestAnimationFrame(function () {
+    loadingEl.style.opacity = '0';
+    setTimeout(function () { loadingEl.style.display = 'none'; }, 850);
+  });
+
+  animate();
+})();
+</script>
+</body>
+</html>
